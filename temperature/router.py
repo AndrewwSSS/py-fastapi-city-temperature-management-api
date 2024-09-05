@@ -19,4 +19,3 @@ async def fetch_temperatures(
     service: TemperatureService = Depends(get_temperature_service),
 ):
     await service.update_cities_temperatures()
-

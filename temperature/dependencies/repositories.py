@@ -5,5 +5,7 @@ from temperature.repositories.temperature_repository import TemperatureRepositor
 from dependencies import get_session
 
 
-def get_temperature_repository(session: AsyncSession = Depends(get_session)) -> TemperatureRepository:
+def get_temperature_repository(
+    session: AsyncSession = Depends(get_session)
+) -> TemperatureRepository:
     return TemperatureRepository(session)

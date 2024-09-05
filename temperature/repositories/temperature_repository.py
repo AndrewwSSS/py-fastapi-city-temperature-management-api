@@ -1,47 +1,57 @@
-from sqlalchemy.ext.asyncio import AsyncSession
 import asyncio
-from datetime import datetime
 
 import httpx
+from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from city.repositories.city_repository import CityRepository
 from db import models
-from dependencies import get_session
 from settings import settings
-from temperature import schemas as temperature_schemas
+from temperature import schemas
 from city import schemas as city_schemas
-
-from city.services.city_service import CityService
 
 
 class TemperatureRepository:
-    def __init__(self, session: AsyncSession):
+    def __init__(
+        self, session: AsyncSession,
+        city_repository: CityRepository = None
+    ):
         self.session = session
+        self.city_repository = city_repository or CityRepository(session)
 
     async def get_temperatures_list(
         self,
         city_id: int = None
-    ) -> list[models.Temperature]:
+    ) -> list[schemas.Temperature]:
         query = select(models.Temperature)
         if city_id:
             query = query.where(models.Temperature.city_id == city_id)
 
         temperature_list = await self.session.execute(query)
-        return [temperature[0] for temperature in temperature_list.fetchall()]
+        return [
+            schemas.Temperature.from_orm(temperature[0])
+            for temperature in temperature_list.fetchall()
+        ]
 
-    async def get_temperature_by_id(self, temperature_id: int):
+    async def get_temperature_by_id(
+        self,
+        temperature_id: int
+    ) -> schemas.Temperature:
         query = select(models.Temperature).where(models.Temperature.id == temperature_id)
         result = await self.session.execute(query)
-        return result.scalar_one_or_none()
+        temperature_db = result.scalar_one_or_none()
+        if temperature_db:
+            return schemas.Temperature.from_orm(
+                temperature_db
+            )
 
     async def create_temperature(
         self,
-        temperature: temperature_schemas.TemperatureCreate,
+        temperature: schemas.TemperatureCreate,
         session: AsyncSession = None
     ) -> models.Temperature:
-        if session is None:
+        if not session:
             session = self.session
         temperature_db = models.Temperature(
             city_id=temperature.city_id,
@@ -51,9 +61,11 @@ class TemperatureRepository:
         session.add(temperature_db)
         await session.commit()
         await session.refresh(temperature_db)
-        return temperature_db
+        return schemas.Temperature.from_orm(
+            temperature_db
+        )
 
-    async def fetch_city_temperature(
+    async def _fetch_city_temperature(
         self,
         city: models.City,
         client: httpx.AsyncClient
@@ -73,19 +85,26 @@ class TemperatureRepository:
         )
         return temperature_schema
 
+    async def _get_temperatures_from_api(
+        self, cities: [city_schemas.City]
+    ) -> tuple[models.Temperature]:
+        async with httpx.AsyncClient() as client:
+            results = await asyncio.gather(
+                *[
+                    self._fetch_city_temperature(city, client)
+                    for city in cities
+                ]
+            )
+        return results
+
     async def fetch_temperatures_for_all_cities(
         self
     ) -> None:
-        city_repository = CityRepository(self.session)
-        cities = await city_repository.get_cities_list()
-        client = httpx.AsyncClient()
-        results = await asyncio.gather(
-            *[
-                self.fetch_city_temperature(city, client)
-                for city in cities
-            ]
-        )
-        self.session.add_all(result for result in results if results)
-        await self.session.commit()
-        await client.aclose()
+        async with self.session.begin():
+            cities = await self.city_repository.get_cities_list()
 
+            results = await self._get_temperatures_from_api(cities)
+
+            self.session.add_all(
+                result for result in results if result
+            )
