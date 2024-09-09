@@ -14,7 +14,7 @@ async def read_cities(
     return await city_service.get_cities_list()
 
 
-@city_router.post("/cities/", response_model=schemas.City)
+@city_router.post("/cities/", response_model=schemas.City, status_code=status.HTTP_201_CREATED)
 async def create_city(
     city: schemas.CityCreate,
     city_service: CityService = Depends(get_city_service)

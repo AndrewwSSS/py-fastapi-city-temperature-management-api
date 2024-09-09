@@ -13,7 +13,7 @@ class CityRepository:
         query = select(models.City)
         cities_list = await self.session.execute(query)
         return [
-            schemas.City.from_orm(city[0])
+            schemas.City.model_validate(city[0], from_attributes=True)
             for city in cities_list.fetchall()
         ]
 
@@ -22,7 +22,7 @@ class CityRepository:
         result = await self.session.execute(query)
         db_city = result.scalar_one_or_none()
         if db_city:
-            return schemas.City.from_orm(db_city)
+            return schemas.City.model_validate(db_city, from_attributes=True)
 
     async def update_city_by_id(
         self,
@@ -42,7 +42,7 @@ class CityRepository:
             db_city.additional_info = city.additional_info
 
         await self.session.refresh(db_city)
-        return schemas.City.from_orm(db_city)
+        return schemas.City.model_validate(db_city, from_attributes=True)
 
     async def create_city(
         self,
@@ -57,7 +57,7 @@ class CityRepository:
 
         await self.session.refresh(db_city)
 
-        return schemas.City.from_orm(db_city)
+        return schemas.City.model_validate(db_city, from_attributes=True)
 
     async def delete_city_by_id(self, city_id: int) -> bool:
         async with self.session.begin():

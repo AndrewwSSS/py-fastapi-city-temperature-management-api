@@ -30,7 +30,7 @@ class TemperatureRepository:
 
         temperature_list = await self.session.execute(query)
         return [
-            schemas.Temperature.from_orm(temperature[0])
+            schemas.Temperature.model_validate(temperature[0], from_attributes=True)
             for temperature in temperature_list.fetchall()
         ]
 
@@ -42,8 +42,9 @@ class TemperatureRepository:
         result = await self.session.execute(query)
         temperature_db = result.scalar_one_or_none()
         if temperature_db:
-            return schemas.Temperature.from_orm(
-                temperature_db
+            return schemas.Temperature.model_validate(
+                temperature_db,
+                from_attributes=True
             )
 
     async def create_temperature(
@@ -61,8 +62,9 @@ class TemperatureRepository:
         session.add(temperature_db)
         await session.commit()
         await session.refresh(temperature_db)
-        return schemas.Temperature.from_orm(
-            temperature_db
+        return schemas.Temperature.model_validate(
+            temperature_db,
+            from_attributes=True
         )
 
     async def _fetch_city_temperature(

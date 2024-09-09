@@ -15,6 +15,3 @@ class TemperatureCreate(TemperatureBase):
 
 class Temperature(TemperatureBase):
     id: int
-
-    class Config:
-        from_attributes = True
