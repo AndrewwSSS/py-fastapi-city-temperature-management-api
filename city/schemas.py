@@ -16,3 +16,6 @@ class CityUpdate(CityBase):
 
 class City(CityBase):
     id: int
+
+    class Config:
+        from_attributes = True
